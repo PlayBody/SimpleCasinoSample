@@ -65,6 +65,44 @@ button:disabled {
     transform: scale(1.05);
 }
 
+.game-info {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  padding: 20px;
+}
+
+.character-container {
+  position: relative; /* This makes it a container for absolute positioning */
+  width: 400px;
+  height: 400px;
+}
+
+.character-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1; /* Places image below the canvas */
+}
+
+#mycanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2; /* Places canvas on top of the image */
+}
+
+.game-controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-left: 20px; /* Adds some space between the game-info and game-controls */
+  width: 300px; /* Control panel width */
+  height: 400px;
+}
+
 @keyframes messagePopIn {
     0% {
         opacity: 0;
