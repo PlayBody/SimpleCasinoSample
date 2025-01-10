@@ -1,0 +1,17 @@
+.icon {
+    font-size: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: left;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+.icon {
+    font-size: 100px;
+    transform-origin: top center;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    padding-top: 20px;
+}
+
