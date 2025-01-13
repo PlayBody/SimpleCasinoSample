@@ -13,14 +13,14 @@ const GameBoard = () => {
     const [betAmount, setBetAmount] = useState(100);
     const [currentAmount, setCurrentAmount] = useState(100);
 
-    const [lineNumber, setLineNumber] = useState(0);
+    const [isAnimation, setIsAnimation] = useState(false);
     const [sniffCount, setSniffCount] = useState(0);
 
     const [prizeMultiplier, setPrizeMultiplier] = useState(1);
     const [currentWager, setCurrentWager] = useState(1);
 
     const [messageKey, setMessageKey] = useState(0);
-    const [resultMessage, setResultMessage] = useState('You can start sniffing now.');
+    const [resultMessage, setResultMessage] = useState('START SNIFFING!');
     
     const [currentProb, setCurrentProb ] = useState(1);
 
@@ -29,6 +29,7 @@ const GameBoard = () => {
    
     const multipliers = [1, 1.5, 2, 3, 5, 7.5, 10, 12.5, 15, 20, 25, 50, 100];
     const survivalFactors = [1, 0.75, 0.5, 0.3, 0.2, 0.15, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005];
+    const numbers = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN'];
     const canvasRef = useRef(null);
 
     const handleAllIn = () => {
@@ -44,6 +45,7 @@ const GameBoard = () => {
 
     const handleBetSubmit = () => {
         if (betAmount <= balance && betAmount > 0) {
+            setItems([]);
             setGameState('playing');
             setCurrentIcon('😎');
             setIconSize(1);
@@ -53,11 +55,45 @@ const GameBoard = () => {
 
             setCurrentProb(1);
             setSniffCount(0);
-            setLineNumber(0);
+            setIsAnimation(0);
             setPrizeMultiplier(1);
-            setResultMessage('You can start sniffing now.');
+            setResultMessage('START SNIFFING!');
             setCurrentWager(1);
+
+            const canvasWidth = 400;
+            const Width = canvasWidth / 18; // Width of each rectangle
+            const Height = 30;
+
+            for(let i = 0; i < 11; i++){
+                const posX = 180 + 13 * (i % 11);
+                const posY = 290 + 25 * Math.floor(sniffCount / 11);
+        
+                // Add a new rectangle to the items array
+                const newItem = {
+                    ox: posX,
+                    oy: posY,
+                    cx: posX,
+                    cy: posY,
+                    width: Width,
+                    height: Height,
+                    color: 'lightblue',
+                    opacity: 1, // Start visible
+                    circles: [],
+                };
+        
+                for(let i = 0; i < 50; i++){
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * 5;
+                    const offsetY = Math.sin(angle) * distance * 4;
+                    const offsetX = Math.cos(angle) * distance / 2 + offsetY * 0.7;
+                    
+                    newItem.circles.push({x: offsetX, y: offsetY, radius: Math.random() * 3, alpah: Math.max(Math.random() * 2)});
+                }
+        
+                setItems((prev) => [...prev, newItem]);
             }
+    
+        }
         else{
             alert('Input valid bet amount.');
         }
@@ -65,10 +101,7 @@ const GameBoard = () => {
 
     const quitGame = () => {
         setGameState('gameover');
-        setSniffCount(0);
-        setPrizeMultiplier(1);
-        setResultMessage('You can start sniffing now.');
-        setCurrentWager(1);
+        setBalance(balance + betAmount * prizeMultiplier);
     }
 
     const handleRestart = () => {
@@ -80,27 +113,29 @@ const GameBoard = () => {
             setBetAmount(100);
         }
     }
-    const itemsRef = useRef(items); // Reference for tracking items in animation loop
 
     let startTime = null;
 
     const animatedNextLine = () => {
         // Start animation to move all items towards the center
-        const targetX = 150; // Center X position of the canvas
-        const targetY = 150; // Center Y position of the canvas
+        const targetX = 200; // Center X position of the canvas
+        const targetY = 30; // Center Y position of the canvas
 
         // Update the position and opacity of each item
         setItems((prevItems) => {
-            return prevItems.map((item) => {
-                const speed = 0.1; // Animation speed (between 0 and 1)
-                const newOpacity = Math.max(0, item.opacity - 0.05); // Fade out items
-
-                // Calculate the new position
-                const newX = item.x + (targetX - item.x) * speed;
-                const newY = item.y + (targetY - item.y) * speed;
-
-                // Return the updated item with new position and opacity
-                return { ...item, x: newX, y: newY, opacity: newOpacity };
+            return prevItems.map((item, index) => {
+                if(index === sniffCount){
+                    const speed = 0.1; // Animation speed (between 0 and 1)
+                    const newOpacity = Math.max(0, item.opacity - 0.05); // Fade out items
+    
+                    // Calculate the new position
+                    const newX = item.cx + (targetX - item.cx) * speed;
+                    const newY = item.cy + (targetY - item.cy) * speed;
+    
+                    // Return the updated item with new position and opacity
+                    return { ...item, cx: newX, cy: newY, opacity: newOpacity };
+                    }
+                    return item;
             });
         });
 
@@ -109,13 +144,10 @@ const GameBoard = () => {
         if (!startTime) startTime = timestamp;
 
         // Continue animating if any item hasn't reached the target
-        if(timestamp - startTime < 1000){
+        if(timestamp - startTime < 800){
             requestAnimationFrame(animatedNextLine);
         }
         else{
-            // Once animation is done, reset game state
-            setItems([]);
-
             setCharacterImg('/assets/prepare.png'); // Change the character image
 
             let newProb = currentProb * survivalFactors[sniffCount];
@@ -132,26 +164,24 @@ const GameBoard = () => {
     
             if (Math.random() > newProb) {
                 setResultMessage('OVERDOSE! You lose.');
+                setPrizeMultiplier(0);
                 setCurrentAmount(0);
-                    quitGame();
+                quitGame();
                 return;
             }
-    
-            setCurrentProb(newProb);
-    
-            setLineNumber(prev => prev + 1); // Increment line number
-            let newWager = currentWager * prizeMultiplier;
-            setCurrentWager(newWager);
-    
-            setCurrentAmount(currentAmount * prizeMultiplier);
-            setSniffCount(0);
-            setResultMessage('You can start sniffing now.');
-                }
+
+            setCurrentAmount(betAmount * prizeMultiplier);
+            setIsAnimation(false);
+            setCurrentAmount(betAmount * prizeMultiplier);
+        }
     };
 
     const handleNextLine = () => {
-//        if (isAnimating) return; // Prevent action while animating
-//        setIsAnimating(true);
+        if (isAnimation) return; // Prevent action while animating
+
+        handleSniff();
+
+        setIsAnimation(true);
         startTime = null;
         setCharacterImg('/assets/sniffing.png'); // Change the character image
 
@@ -163,31 +193,12 @@ const GameBoard = () => {
     const handleSniff = () => {
         if (sniffCount >= 11) return;
 
-        const canvasWidth = 400;
-        const Width = canvasWidth / 25; // Width of each rectangle
-        const Height = 30;
-        const X = sniffCount * Width * 2; // X position based on sniff count
-        const Y = 400 - Height * 2; // Bottom of the canvas
-
-        // Add a new rectangle to the items array
-        const newItem = {
-            x: X,
-            y: Y,
-            width: Width,
-            height: Height,
-            color: 'lightblue',
-            opacity: 1, // Start visible
-//            animating: true // Indicate that it's being animated
-        };
-
-        setItems((prev) => [...prev, newItem]);
-
         let newSniffCount = sniffCount + 1;
         setSniffCount(newSniffCount);
         let newPrizeMultiplier = multipliers[newSniffCount];
         setPrizeMultiplier(newPrizeMultiplier);
         setMessageKey(prev => prev + 1);
-        setResultMessage(`You sniffed ${newSniffCount} on this line${'!'.repeat(newSniffCount)}`);
+        setResultMessage(`YOU DID ${numbers[newSniffCount]} LINE${newSniffCount>1?'S':''}!`);
 
         let newProb = currentProb * survivalFactors[newSniffCount];
 
@@ -214,17 +225,33 @@ const GameBoard = () => {
     };
 
     const handleCashOut = () => {
+        if(isAnimation) return;
+
         setResultMessage(`You cashed out with $${currentAmount}!`);
         let newBalance = balance + currentAmount;
         setBalance(newBalance)
         quitGame();
     };
-    
+
+    // eslint-disable-next-line
     const drawItems = (ctx) => {
         items.forEach((item) => {
             ctx.fillStyle = item.color;
-            ctx.globalAlpha = item.opacity; // Set opacity for fade-out effect
-            ctx.fillRect(item.x, item.y, item.width, item.height);
+
+            item.circles.forEach(circle => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${circle.alpah * (1 - (1 - item.opacity) * 0.9)})`;
+                ctx.beginPath();
+                ctx.arc(item.ox + circle.x, item.oy + circle.y, circle.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            item.circles.forEach(circle => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${circle.alpah * item.opacity})`;
+                ctx.beginPath();
+                ctx.arc(item.cx + circle.x, item.cy + circle.y, circle.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
         });
     };
 
@@ -274,49 +301,47 @@ const GameBoard = () => {
 
     if (gameState === 'gameover') {
         return (
-            <div className="game-over">
-                <div className="game-over-content">
-                    <h1>{currentAmount > 0 ? "🎉 You Won!" : "😢 Game Over"}</h1>
-                    <h2>Final Balance: ${balance.toFixed(2)}</h2>
-                    <button onClick={handleRestart}>Play Again</button>
+            <div className="container" >
+            <div className="game-info">
+                <div className='character-container'>
+                    <img src={characterImg} alt='Sniffing Character' className='character-image' width={400} height={350}/>
+                    <canvas id='mycanvas' ref={canvasRef} width='400' height='350'></canvas>
+                </div>
+                <div className="game-controls">
+                <p>{currentAmount === 0 ? "YOU OD'D" : 'YOU EARN $' + betAmount * prizeMultiplier}</p>
+                <button onClick={handleRestart}
+                    >
+                        PLAY AGAIN
+                </button>
                 </div>
             </div>
+            <div className='icon-container'>
+                <Icon wager={iconSize} icon = {currentIcon} />
+            </div>
+        </div>
         );
     }
 
     return (
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+        <div className="container" >
             <div className="game-info">
                 <div className='character-container'>
-                    <img src={characterImg} alt='Sniffing Character' className='character-image' width={400} height={400}/>
-                    <canvas id='mycanvas' ref={canvasRef} width='400' height='400'></canvas>
+                    <img src={characterImg} alt='Sniffing Character' className='character-image' width={400} height={350}/>
+                    <canvas id='mycanvas' ref={canvasRef} width='400' height='350'></canvas>
                 </div>
                 <div className="game-controls">
-                    <h1>Sniff To Win!</h1>
-                    <p>Betting Amount: ${betAmount.toFixed(2)} Balance: ${balance.toFixed(2)} </p>
-                    <button 
-                        onClick={handleSniff} 
-                        disabled={sniffCount >= 11}
-                        style={{ opacity: sniffCount >= 11 ? 0.5 : 1 }}
-                    >
-                        Sniff
-                    </button>
-                    <p style={{ fontWeight: 'bold' }}>Line Number: {lineNumber}</p>
-                    <p style={{ fontWeight: 'bold' }}>DO ANOTHER LINE</p>
-                    <p key={messageKey} className="message-animation">{resultMessage}</p>
-                    <p>Prize Multiplier: {prizeMultiplier}x</p>
+                <p>YOUR BET: ${betAmount.toFixed(2)}</p>
+                <p key={messageKey} className="message-animation">{resultMessage}</p>
+                    <p style={{ fontWeight: 'bold' }}>DO ANOTHER LINE?</p>
                     <button onClick={handleNextLine}
-                        disabled={sniffCount === 0}
-                        style={{ opacity: sniffCount === 0 ? 0.5 : 1 }}
                     >
-                        Sniff To Win!
+                        SNIFF FOR ${multipliers[sniffCount+1]}X
                     </button>
-                    <button
+                    <p>CASH OUT</p>
+                    <button className='cash-out-button'
                         onClick={handleCashOut}
-                        disabled={lineNumber === 0}
-                        style={{ opacity: lineNumber === 0 ? 0.5 : 1 }}
                         >
-                            Cash Out ${currentAmount.toFixed(2)}
+                            Cash Out <br/>${betAmount * prizeMultiplier}
                     </button>
                 </div>
             </div>
