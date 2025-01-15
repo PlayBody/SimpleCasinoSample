@@ -14,6 +14,9 @@ const GameBoard = () => {
     const [currentAmount, setCurrentAmount] = useState(100);
 
     const [isAnimation, setIsAnimation] = useState(false);
+    const [isSniffButtonAnimated, setIsSniffButtonAnimated] = useState(false);
+    const [isBouncing, setIsBouncing] = useState(false);
+
     const [sniffCount, setSniffCount] = useState(0);
 
     const [prizeMultiplier, setPrizeMultiplier] = useState(1);
@@ -26,7 +29,14 @@ const GameBoard = () => {
 
     const [items, setItems] = useState([]); // Store all the rectangles
     const [characterImg, setCharacterImg] = useState('/assets/prepare.png'); // Store the character path
-   
+
+    const [particles, setParticles] = useState([]);
+
+    const AnimatingTime = 1500;
+
+    const targetX = 220; // Center X position of the canvas
+    const targetY = 35; // Center Y position of the canvas
+
     const multipliers = [1, 1.5, 2, 3, 5, 7.5, 10, 12.5, 15, 20, 25, 50, 100];
     const survivalFactors = [1, 0.75, 0.5, 0.3, 0.2, 0.15, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005];
     const numbers = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN'];
@@ -99,13 +109,34 @@ const GameBoard = () => {
         }
     };
 
-    const quitGame = () => {
+    const quitGame = (bOd) => {
         setGameState('gameover');
-        setBalance(balance + betAmount * prizeMultiplier);
+
+        if(!bOd){
+            const newParticles = Array.from({ length: 50 }, (_, index) => ({
+                id: index,
+                left: `${Math.random() * 100}vw`,
+                top: `${Math.random() * 20}vh`,
+                color: `hsl(${Math.random() * 360}, 100%, 60%)`
+            }));
+            setParticles(newParticles);
+
+            setTimeout(() => {
+                setParticles([]);
+            }, 1000); // Particles disappear after 1 second
+
+            setBalance(balance + betAmount * prizeMultiplier);
+        }
+        else{
+            setCharacterImg('/assets/lose.png');
+        }
     }
 
     const handleRestart = () => {
         setGameState('betting');
+        setCharacterImg('/assets/prepare.png');
+        setParticles([]);
+        setIsBouncing(false);
         setCurrentIcon('💰');
         if(balance === 0){
             alert("You are run out of balance. I will give you $100 as gift");
@@ -118,19 +149,23 @@ const GameBoard = () => {
 
     const animatedNextLine = () => {
         // Start animation to move all items towards the center
-        const targetX = 200; // Center X position of the canvas
-        const targetY = 30; // Center Y position of the canvas
+
+        const timestamp = Date.now();
+
+        if (!startTime) startTime = timestamp;
+
+        let rate = (timestamp - startTime) / AnimatingTime;
+        rate = Math.min(rate, 1);
 
         // Update the position and opacity of each item
         setItems((prevItems) => {
             return prevItems.map((item, index) => {
                 if(index === sniffCount){
-                    const speed = 0.1; // Animation speed (between 0 and 1)
-                    const newOpacity = Math.max(0, item.opacity - 0.05); // Fade out items
+                    const newOpacity = 1 - rate;
     
                     // Calculate the new position
-                    const newX = item.cx + (targetX - item.cx) * speed;
-                    const newY = item.cy + (targetY - item.cy) * speed;
+                    const newX = item.cx + (targetX - item.cx) * rate;
+                    const newY = item.cy + (targetY - item.cy) * rate;
     
                     // Return the updated item with new position and opacity
                     return { ...item, cx: newX, cy: newY, opacity: newOpacity };
@@ -139,18 +174,14 @@ const GameBoard = () => {
             });
         });
 
-        const timestamp = Date.now();
-
-        if (!startTime) startTime = timestamp;
-
         // Continue animating if any item hasn't reached the target
-        if(timestamp - startTime < 800){
+        if(timestamp - startTime <= AnimatingTime){
             requestAnimationFrame(animatedNextLine);
         }
         else{
             setCharacterImg('/assets/prepare.png'); // Change the character image
 
-            let newProb = currentProb * survivalFactors[sniffCount];
+            let newProb = survivalFactors[sniffCount + 1];
 
             if(newProb > 0.5){
                 setCurrentIcon('😇');
@@ -161,12 +192,14 @@ const GameBoard = () => {
             else{
                 setCurrentIcon('😈');
             }
-    
-            if (Math.random() > newProb) {
+
+            let rnd = Math.random();
+            console.log(rnd, newProb);
+            if (rnd > newProb) {
                 setResultMessage('OVERDOSE! You lose.');
                 setPrizeMultiplier(0);
                 setCurrentAmount(0);
-                quitGame();
+                quitGame(true);
                 return;
             }
 
@@ -176,10 +209,13 @@ const GameBoard = () => {
         }
     };
 
-    const handleNextLine = () => {
+    const handleSniff = () => {
         if (isAnimation) return; // Prevent action while animating
 
-        handleSniff();
+        sniff();
+
+        setIsSniffButtonAnimated(true);
+        setTimeout(() => setIsSniffButtonAnimated(false), 1000); // Reset after animation duration
 
         setIsAnimation(true);
         startTime = null;
@@ -190,7 +226,7 @@ const GameBoard = () => {
 
     };
 
-    const handleSniff = () => {
+    const sniff = () => {
         if (sniffCount >= 11) return;
 
         let newSniffCount = sniffCount + 1;
@@ -230,9 +266,21 @@ const GameBoard = () => {
         setResultMessage(`You cashed out with $${currentAmount}!`);
         let newBalance = balance + currentAmount;
         setBalance(newBalance)
-        quitGame();
+        quitGame(false);
     };
 
+    const handleMouseEnter = () => {
+        if(isAnimation)
+            return;
+        if(sniffCount >= 2){
+            setIsBouncing(true);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        setIsBouncing(false);
+    };
+    
     // eslint-disable-next-line
     const drawItems = (ctx) => {
         items.forEach((item) => {
@@ -306,8 +354,19 @@ const GameBoard = () => {
                 <div className='character-container'>
                     <img src={characterImg} alt='Sniffing Character' className='character-image' width={400} height={350}/>
                     <canvas id='mycanvas' ref={canvasRef} width='400' height='350'></canvas>
+                    {particles.map((particle) => (
+                        <div
+                            key={particle.id}
+                            className="particle"
+                            style={{
+                                left: particle.left,
+                                top: particle.top,
+                                backgroundColor: particle.color
+                            }}
+                        ></div>
+                ))}
                 </div>
-                <div className="game-controls">
+                <div className="game-over">
                 <p>{currentAmount === 0 ? "YOU OD'D" : 'YOU EARN $' + betAmount * prizeMultiplier}</p>
                 <button onClick={handleRestart}
                     >
@@ -333,13 +392,17 @@ const GameBoard = () => {
                 <p>YOUR BET: ${betAmount.toFixed(2)}</p>
                 <p key={messageKey} className="message-animation">{resultMessage}</p>
                     <p style={{ fontWeight: 'bold' }}>DO ANOTHER LINE?</p>
-                    <button onClick={handleNextLine}
+                    <button
+                        className={`sniff-button ${isSniffButtonAnimated ? 'swing' : isBouncing ? 'emphaize' : '' }`}
+                        onClick={handleSniff}
                     >
-                        SNIFF FOR ${multipliers[sniffCount+1]}X
+                        SNIFF FOR {multipliers[sniffCount+1]}X
                     </button>
                     <p>CASH OUT</p>
-                    <button className='cash-out-button'
+                    <button className={`cash-out-button`}
                         onClick={handleCashOut}
+                        onMouseEnter={handleMouseEnter} 
+                        onMouseLeave={handleMouseLeave}
                         >
                             Cash Out <br/>${betAmount * prizeMultiplier}
                     </button>
